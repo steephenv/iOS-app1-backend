@@ -8,10 +8,8 @@
 import Foundation
 
 enum APIConfig {
-    /// Base URL of the backend in `backend/`. Update this once the server is
-    /// deployed on Render — for local testing in the iOS Simulator only,
-    /// "http://localhost:3000" reaches a server running on this Mac.
-    static let baseURL = URL(string: "http://localhost:3000")!
+    /// Base URL of the backend in `backend/`, deployed on Render.
+    static let baseURL = URL(string: "https://ios-app-backend.onrender.com")!
 }
 
 struct AuthResponse: Decodable {
