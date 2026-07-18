@@ -7,21 +7,31 @@
 
 import SwiftUI
 
-/// Observable chat state for the assistant screen, backed by the
-/// `backend/` API and Gemini.
+/// Observable chat state for a single conversation, backed by the
+/// `backend/` API and Gemini. `conversationId` starts as `nil` for a chat
+/// that hasn't been saved yet — it's adopted from the server's response
+/// once the first message is sent.
 @MainActor
 @Observable
 final class AssistantViewModel {
+    private(set) var conversationId: String?
+    private(set) var title: String
     private(set) var messages: [ChatMessage] = []
     private(set) var isSending = false
     private(set) var isLoadingHistory = false
     var errorMessage: String?
 
+    init(conversationId: String?, title: String) {
+        self.conversationId = conversationId
+        self.title = title
+    }
+
     func loadHistory() async {
+        guard let conversationId else { return }
         isLoadingHistory = true
         defer { isLoadingHistory = false }
         do {
-            messages = try await APIClient.shared.fetchHistory()
+            messages = try await APIClient.shared.fetchMessages(conversationId: conversationId)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -32,17 +42,19 @@ final class AssistantViewModel {
         guard !trimmed.isEmpty else { return }
         errorMessage = nil
 
-        let userMessage = ChatMessage(id: UUID().uuidString, role: "user", content: trimmed, createdAt: Date())
-        messages.append(userMessage)
+        let optimisticMessage = ChatMessage(id: UUID().uuidString, role: "user", content: trimmed, createdAt: Date())
+        messages.append(optimisticMessage)
 
         isSending = true
         defer { isSending = false }
         do {
-            let reply = try await APIClient.shared.sendMessage(trimmed)
-            messages.append(reply)
+            let response = try await APIClient.shared.sendMessage(conversationId: conversationId, text: trimmed)
+            conversationId = response.conversationId
+            title = response.title
+            messages.append(response.reply)
         } catch {
             errorMessage = error.localizedDescription
-            messages.removeAll { $0.id == userMessage.id }
+            messages.removeAll { $0.id == optimisticMessage.id }
         }
     }
 }

@@ -26,11 +26,28 @@ struct ChatMessage: Decodable, Identifiable, Equatable {
     var isFromUser: Bool { role == "user" }
 }
 
-private struct HistoryResponse: Decodable {
+struct Conversation: Decodable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let updatedAt: Date
+}
+
+private struct ConversationsResponse: Decodable {
+    let conversations: [Conversation]
+}
+
+private struct MessagesResponse: Decodable {
     let messages: [ChatMessage]
 }
 
-private struct ChatResponse: Decodable {
+private struct SendMessageBody: Encodable {
+    let conversationId: String?
+    let message: String
+}
+
+struct SendMessageResponse: Decodable {
+    let conversationId: String
+    let title: String
     let userMessage: ChatMessage
     let reply: ChatMessage
 }
@@ -92,14 +109,41 @@ final class APIClient {
 
     // MARK: - Assistant
 
-    func fetchHistory() async throws -> [ChatMessage] {
-        let response: HistoryResponse = try await send(path: "/api/assistant/history", method: "GET", authorized: true)
+    func fetchConversations() async throws -> [Conversation] {
+        let response: ConversationsResponse = try await send(path: "/api/assistant/conversations", method: "GET", authorized: true)
+        return response.conversations
+    }
+
+    func deleteConversation(id: String) async throws {
+        var request = URLRequest(url: APIConfig.baseURL.appendingPathComponent("/api/assistant/conversations/\(id)"))
+        request.httpMethod = "DELETE"
+        try attachAuthorization(to: &request, required: true)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
+            throw APIError.server(message ?? "Request failed (\(httpResponse.statusCode)).")
+        }
+    }
+
+    func fetchMessages(conversationId: String) async throws -> [ChatMessage] {
+        let response: MessagesResponse = try await send(
+            path: "/api/assistant/conversations/\(conversationId)/messages",
+            method: "GET",
+            authorized: true
+        )
         return response.messages
     }
 
-    func sendMessage(_ text: String) async throws -> ChatMessage {
-        let response: ChatResponse = try await send(path: "/api/assistant/chat", body: ["message": text], authorized: true)
-        return response.reply
+    func sendMessage(conversationId: String?, text: String) async throws -> SendMessageResponse {
+        try await send(
+            path: "/api/assistant/messages",
+            body: SendMessageBody(conversationId: conversationId, message: text),
+            authorized: true
+        )
     }
 
     // MARK: - Networking

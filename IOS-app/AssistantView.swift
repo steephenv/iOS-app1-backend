@@ -8,42 +8,29 @@
 import SwiftUI
 
 struct AssistantView: View {
-    @Environment(AuthManager.self) private var auth
-    @State private var viewModel = AssistantViewModel()
+    @State private var viewModel: AssistantViewModel
     @State private var draft = ""
     @FocusState private var isInputFocused: Bool
 
+    init(conversationId: String?, title: String) {
+        _viewModel = State(initialValue: AssistantViewModel(conversationId: conversationId, title: title))
+    }
+
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                messageList
+        VStack(spacing: 0) {
+            messageList
 
-                if let errorMessage = viewModel.errorMessage {
-                    AuthErrorBanner(message: errorMessage)
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
-                }
+            if let errorMessage = viewModel.errorMessage {
+                AuthErrorBanner(message: errorMessage)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            }
 
-                inputBar
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Assistant")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        if let email = auth.currentEmail {
-                            Text(email)
-                        }
-                        Button("Sign Out", role: .destructive) {
-                            auth.signOut()
-                        }
-                    } label: {
-                        Image(systemName: "person.circle")
-                    }
-                }
-            }
+            inputBar
         }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(viewModel.title)
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadHistory()
         }
@@ -151,6 +138,8 @@ private struct ChatBubble: View {
 }
 
 #Preview {
-    AssistantView()
-        .environment(AuthManager())
+    NavigationStack {
+        AssistantView(conversationId: nil, title: "New Chat")
+    }
+    .environment(AuthManager())
 }
