@@ -47,7 +47,7 @@ struct AuthenticationView: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 40))
                 .foregroundStyle(Color.accentColor)
-            Text("IOS App")
+            Text("Assistant")
                 .font(.largeTitle.bold())
         }
     }
